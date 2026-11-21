@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tangkap Kucing! 🐱</title>
+
+  <!-- =====================================================
+       BAGIAN 1: TAMPILAN (CSS)
+       Mengatur warna, ukuran, dan animasi.
+       ===================================================== -->
+  <style>
+    /* ---------- Warna utama (ubah di sini kalau mau ganti warna) ---------- */
+    :root {
+      --latar: #fff3e0;      /* warna latar halaman */
+      --kartu: #ffffff;      /* warna kotak/kartu */
+      --teks: #4a2c2a;       /* warna tulisan */
+      --pink: #ff6fa5;       /* warna tombol */
+      --pink-gelap: #c94a7d; /* bayangan tombol */
+      --kuning: #ffd24d;
+    }
+
+    /* ---------- Pengaturan dasar ---------- */
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--latar);
+      color: var(--teks);
+      font-family: "Comic Sans MS", "Chalkboard SE", sans-serif;
+      text-align: center;
+    }
+
+    /* ---------- Layar ----------
+       Website ini punya 4 "layar". Hanya 1 yang tampil dalam satu waktu.
+       Layar yang tampil diberi class "aktif". */
+    .layar {
+      display: none;
+      min-height: 100vh;
+      padding: 16px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .layar.aktif { display: flex; }
+
+    h1 { font-size: 2rem; margin: 0.3em 0; }
+
+    /* ---------- Tombol ---------- */
+    button {
+      font: inherit;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: white;
+      background: var(--pink);
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 28px;
+      box-shadow: 0 5px 0 var(--pink-gelap);
+      cursor: pointer;
+    }
+    button:active {            /* efek tombol "tertekan" */
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 var(--pink-gelap);
+    }
+
+    /* ---------- Layar 2: Game ---------- */
+    #arena {
+      position: relative;      /* supaya kucing bisa diletakkan bebas di dalamnya */
+      width: 100%;
+      max-width: 460px;
+      height: 60vh;
+      background: var(--kartu);
+      border: 4px dashed var(--pink);
+      border-radius: 24px;
+      overflow: hidden;
+    }
+
+    .kucing {
+      position: absolute;
+      font-size: 3rem;
+      cursor: pointer;
+      user-select: none;
+      animation: muncul 0.25s;
+    }
+    @keyframes muncul {        /* kucing "membesar" saat muncul */
+      from { transform: scale(0); }
+      to   { transform: scale(1); }
+    }
+
+    #bar {                     /* kotak progress bar */
+      width: 100%;
+      max-width: 460px;
+      height: 16px;
+      margin: 10px 0;
+      background: var(--kartu);
+      border: 2px solid var(--teks);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    #isi-bar {                 /* isi progress bar yang memanjang */
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--kuning), var(--pink));
+      transition: width 0.2s;
+    }
+
+    /* ---------- Layar 3: Loading "error" ---------- */
+    #layar-glitch.aktif {
+      background: black;
+      color: #00ff00;
+      font-family: monospace;
+      animation: getar 0.15s infinite;
+    }
+    @keyframes getar {         /* efek layar bergetar */
+      0%   { transform: translate(2px, 0); }
+      50%  { transform: translate(-3px, 2px); }
+      100% { transform: translate(0, -2px); }
+    }
+
+    /* ---------- Layar 4: Kejutan ulang tahun ---------- */
+    .kartu {
+      background: var(--kartu);
+      border-radius: 22px;
+      padding: 18px;
+      max-width: 440px;
+      width: 100%;
+      margin: 10px 0;
+      box-shadow: 0 8px 0 rgba(0, 0, 0, 0.12);
+    }
+
+    .polaroid {                /* bingkai foto ala polaroid */
+      display: inline-block;
+      background: white;
+      color: #333;
+      padding: 10px 10px 30px;
+      border-radius: 6px;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+      transform: rotate(-3deg);
+    }
+    .polaroid img {
+      display: block;
+      width: 240px;
+      height: 240px;
+      max-width: 70vw;
+      object-fit: cover;       /* foto dipotong rapi, tidak gepeng */
+      border-radius: 4px;
+    }
+    .polaroid p { margin: 8px 0 0; font-weight: bold; }
+
+    #kue {
+      font-size: 5rem;
+      cursor: pointer;
+      animation: goyang 1s infinite alternate;
+    }
+    @keyframes goyang {
+      to { transform: translateY(-10px) rotate(5deg); }
+    }
+
+    /* ---------- Kanvas konfeti (menutupi seluruh layar) ---------- */
+    #konfeti {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;    /* supaya tidak menghalangi klik */
+      z-index: 9;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- =====================================================
+       BAGIAN 2: ISI HALAMAN (HTML)
+       ===================================================== -->
+
+  <canvas id="konfeti"></canvas>
+
+  <!-- LAYAR 1: Halaman awal (terlihat seperti game biasa) -->
+  <section class="layar aktif" id="layar-awal">
+    <div style="font-size: 4rem">🐱</div>
+    <h1>Tangkap Kucing!</h1>
+    <p>Ketuk 10 kucing yang muncul sebelum kabur.<br>Katanya sih gampang… 😼</p>
+    <button id="tombol-mulai">MULAI</button>
+  </section>
+
+  <!-- LAYAR 2: Game -->
+  <section class="layar" id="layar-game">
+    <div>Skor: <b id="skor">0</b> / 10</div>
+    <div id="bar"><div id="isi-bar"></div></div>
+    <div id="arena"></div>
+  </section>
+
+  <!-- LAYAR 3: Loading palsu yang "error" -->
+  <section class="layar" id="layar-glitch">
+    <h1 id="glitch-judul">MEMUAT HADIAH… 0%</h1>
+    <p id="glitch-teks">tunggu sebentar ya…</p>
+  </section>
+
+  <!-- LAYAR 4: Kejutan! -->
+  <section class="layar" id="layar-kejutan">
+    <h1>🎉 SELAMAT ULANG TAHUN, <span id="nama"></span>! 🎂</h1>
+
+    <div class="kartu">
+      Ternyata kamu bukan menangkap kucing…
+      <b>kamu menangkap umur baru!</b> 😹
+    </div>
+
+    <div class="polaroid" id="polaroid">
+      <img id="foto" alt="foto kenangan">
+      <p id="keterangan"></p>
+    </div>
+    <button id="tombol-foto" style="margin: 16px 0">Foto berikutnya ➡️</button>
+
+    <div class="kartu" id="pesan"></div>
+
+    <div id="kue">🎂</div>
+    <p id="petunjuk">Ketuk kuenya untuk tiup lilin! 🕯️</p>
+    <div class="kartu" id="penutup" style="display: none">
+      🕯️💨 Tiup berhasil! Semoga semua doamu terkabul,
+      <b>awas jangan lupa traktir!</b> 🍕
+    </div>
+  </section>
+
+
+  <!-- =====================================================
+       BAGIAN 3: LOGIKA (JavaScript)
+       ===================================================== -->
+  <script>
+
+    /* ===================================================
+       ✏️ PENGATURAN — HANYA BAGIAN INI YANG PERLU KAMU UBAH
+       =================================================== */
+
+    // Nama yang berulang tahun
+    var NAMA = "Sayang";
+
+    // Pesan ucapan (bebas, tulis sepanjang apa pun)
+    var PESAN = "Terima kasih sudah jadi orang yang paling bikin hari-hariku seru. " +
+                "Semoga panjang umur, sehat selalu, dan makin bahagia. Aku sayang kamu! ❤️";
+
+    // Daftar foto. Taruh file foto di folder yang SAMA dengan file ini,
+    // lalu tulis nama filenya. Contoh: ["foto1.jpg", "foto2.jpg", "foto3.jpg"]
+    // Kalau dikosongkan, akan tampil gambar emoji sebagai contoh.
+    var FOTO = [];
+
+    // Tulisan di bawah tiap foto (urutannya sama dengan daftar FOTO)
+    var KETERANGAN = [
+      "Foto paling lucu 😆",
+      "Kenangan favorit 💕",
+      "Wajah saat dikasih makan 🍜",
+      "Pose andalan 😎"
+    ];
+
+    // Berapa kucing yang harus ditangkap sebelum kejutan muncul
+    var TARGET = 10;
+
+    // Berapa lama kucing muncul sebelum kabur (dalam milidetik, 1000 = 1 detik)
+    var WAKTU_KUCING = 1300;
+
+    /* ===================================================
+       ⛔ DI BAWAH INI TIDAK PERLU DIUBAH
+       =================================================== */
+
+    // Fungsi singkat untuk mengambil elemen berdasarkan id
+    function ambil(id) {
+      return document.getElementById(id);
+    }
+
+    // Pindah ke layar lain: sembunyikan semua, tampilkan satu
+    function tampilkanLayar(id) {
+      var semua = document.querySelectorAll(".layar");
+      for (var i = 0; i < semua.length; i++) {
+        semua[i].classList.remove("aktif");
+      }
+      ambil(id).classList.add("aktif");
+    }
+
+    // Isi nama dan pesan ke halaman
+    ambil("nama").textContent = NAMA;
+    ambil("pesan").textContent = PESAN;
+
+
+    /* ---------- GAME ---------- */
+
+    var skor = 0;          // jumlah kucing yang sudah ditangkap
+    var penghitungWaktu;   // timer kucing yang sedang tampil
+
+    // Tombol MULAI ditekan
+    ambil("tombol-mulai").onclick = function () {
+      skor = 0;
+      perbaruiSkor();
+      tampilkanLayar("layar-game");
+      munculkanKucing();
+    };
+
+    // Update angka skor dan progress bar
+    function perbaruiSkor() {
+      ambil("skor").textContent = skor;
+      ambil("isi-bar").style.width = (skor / TARGET * 100) + "%";
+    }
+
+    // Munculkan 1 kucing di tempat acak
+    function munculkanKucing() {
+      // Kalau target sudah tercapai, lanjut ke layar "error"
+      if (skor >= TARGET) {
+        mulaiGlitch();
+        return;
+      }
+
+      var arena = ambil("arena");
+      var kucing = document.createElement("div");
+      kucing.className = "kucing";
+      kucing.textContent = "🐱";
+
+      // Posisi acak di dalam arena
+      kucing.style.left = Math.random() * (arena.clientWidth - 60) + "px";
+      kucing.style.top  = Math.random() * (arena.clientHeight - 60) + "px";
+
+      var sudahHilang = false;
+
+      // Kalau kucing diketuk: skor +1, munculkan kucing berikutnya
+      kucing.onpointerdown = function () {
+        if (sudahHilang) return;
+        sudahHilang = true;
+        kucing.remove();
+        skor++;
+        perbaruiSkor();
+        clearTimeout(penghitungWaktu);
+        munculkanKucing();
+      };
+
+      arena.appendChild(kucing);
+
+      // Kalau tidak diketuk sampai waktunya habis: kucing kabur
+      penghitungWaktu = setTimeout(function () {
+        if (!sudahHilang) {
+          sudahHilang = true;
+          kucing.remove();
+          munculkanKucing();
+        }
+      }, WAKTU_KUCING);
+    }
+
+
+    /* ---------- LAYAR "ERROR" (loading palsu) ---------- */
+
+    function mulaiGlitch() {
+      tampilkanLayar("layar-glitch");
+
+      var persen = 0;
+      var kalimat = [
+        "menghapus kucing…",
+        "ada yang aneh…",
+        "ERROR 404: KUCING HILANG",
+        "ini bukan game biasa 👀"
+      ];
+
+      // Naikkan persen setiap 0,28 detik
+      var jam = setInterval(function () {
+        persen += Math.floor(Math.random() * 12) + 5;
+        if (persen > 100) persen = 100;
+
+        ambil("glitch-judul").textContent = "MEMUAT HADIAH… " + persen + "%";
+
+        // Pilih kalimat sesuai persen (0-25 → kalimat 1, 26-50 → kalimat 2, dst.)
+        var nomor = Math.min(3, Math.floor(persen / 26));
+        ambil("glitch-teks").textContent = kalimat[nomor];
+
+        // Setelah 100%, tampilkan kejutan
+        if (persen >= 100) {
+          clearInterval(jam);
+          setTimeout(tampilkanKejutan, 500);
+        }
+      }, 280);
+    }
+
+
+    /* ---------- KEJUTAN ULANG TAHUN ---------- */
+
+    var nomorFoto = 0;                       // foto yang sedang tampil
+    var EMOJI_CONTOH = ["🐶", "🐸", "🐰", "🥳"]; // dipakai kalau FOTO kosong
+
+    // Membuat gambar emoji sederhana sebagai pengganti foto
+    function gambarEmoji(emoji) {
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240">' +
+                '<rect width="240" height="240" fill="#ffd1e3"/>' +
+                '<text x="120" y="150" font-size="100" text-anchor="middle">' +
+                emoji + '</text></svg>';
+      return "data:image/svg+xml," + encodeURIComponent(svg);
+    }
+
+    // Tampilkan foto sesuai nomorFoto
+    function tampilkanFoto() {
+      if (FOTO.length > 0) {
+        ambil("foto").src = FOTO[nomorFoto % FOTO.length];
+      } else {
+        ambil("foto").src = gambarEmoji(EMOJI_CONTOH[nomorFoto % EMOJI_CONTOH.length]);
+      }
+      ambil("keterangan").textContent = KETERANGAN[nomorFoto % KETERANGAN.length];
+
+      // Miringkan foto bergantian ke kiri dan kanan
+      var miring = (nomorFoto % 2 === 0) ? -3 : 3;
+      ambil("polaroid").style.transform = "rotate(" + miring + "deg)";
+    }
+
+    function tampilkanKejutan() {
+      tampilkanLayar("layar-kejutan");
+      tampilkanFoto();
+      hujanKonfeti(160);
+    }
+
+    // Tombol "Foto berikutnya"
+    ambil("tombol-foto").onclick = function () {
+      nomorFoto++;
+      tampilkanFoto();
+      hujanKonfeti(30);
+    };
+
+    // Kue diketuk = lilin ditiup
+    ambil("kue").onclick = function () {
+      ambil("kue").textContent = "🕯️💨";
+      ambil("petunjuk").style.display = "none";
+      ambil("penutup").style.display = "block";
+      hujanKonfeti(220);
+    };
+
+
+    /* ---------- KONFETI ---------- */
+
+    var kanvas = ambil("konfeti");
+    var gambar = kanvas.getContext("2d");
+    var kepingan = [];        // daftar semua kertas konfeti
+    var sedangJalan = false;
+
+    function aturUkuran() {
+      kanvas.width = window.innerWidth;
+      kanvas.height = window.innerHeight;
+    }
+    aturUkuran();
+    window.addEventListener("resize", aturUkuran);
+
+    // Tambahkan sejumlah konfeti baru
+    function hujanKonfeti(jumlah) {
+      var warna = ["#ff6fa5", "#ffd24d", "#6ec6ff", "#8be28b", "#c39bff"];
+      for (var i = 0; i < jumlah; i++) {
+        kepingan.push({
+          x: Math.random() * kanvas.width,
+          y: -10 - Math.random() * kanvas.height * 0.4,
+          geserX: Math.random() * 4 - 2,
+          jatuhY: Math.random() * 3 + 2,
+          ukuran: Math.random() * 8 + 4,
+          warna: warna[i % warna.length],
+          putar: Math.random() * 6
+        });
+      }
+      if (!sedangJalan) {
+        sedangJalan = true;
+        animasiKonfeti();
+      }
+    }
+
+    // Menggerakkan dan menggambar konfeti terus-menerus
+    function animasiKonfeti() {
+      gambar.clearRect(0, 0, kanvas.width, kanvas.height);
+
+      // Buang konfeti yang sudah jatuh keluar layar
+      kepingan = kepingan.filter(function (k) {
+        return k.y < kanvas.height + 20;
+      });
+
+      kepingan.forEach(function (k) {
+        k.x += k.geserX;
+        k.y += k.jatuhY;
+        k.putar += 0.1;
+
+        gambar.save();
+        gambar.translate(k.x, k.y);
+        gambar.rotate(k.putar);
+        gambar.fillStyle = k.warna;
+        gambar.fillRect(-k.ukuran / 2, -k.ukuran / 2, k.ukuran, k.ukuran * 0.6);
+        gambar.restore();
+      });
+
+      if (kepingan.length > 0) {
+        requestAnimationFrame(animasiKonfeti);
+      } else {
+        sedangJalan = false;
+      }
+    }
+
+  </script>
+</body>
+</html>
